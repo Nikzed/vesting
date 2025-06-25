@@ -31,9 +31,9 @@ class VestingTest extends AnyFunSuite, ScalusTest {
 
     test("Successful spend scenario by owner before timeout") {
         val testCase = TestCase(
-            signatories = List(ownerPKH),
-            lockUntil = 17000000,
-            interval = Interval.always
+          signatories = List(ownerPKH),
+          lockUntil = 17000000,
+          interval = Interval.always
         )
         val result = checkTestCase(testCase)
         assert(result.isSuccess)
@@ -42,7 +42,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
     case class TestCase(
         signatories: List[PubKeyHash],
         lockUntil: BigInt,
-        interval: Interval,
+        interval: Interval
     )
 
     def checkTestCase(testCase: TestCase): Result = {
@@ -51,7 +51,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
             hex"1234567890abcdef1234567890abcdef1234567890abcdef12345678",
             0
           )
-        ) // test [join lines VS Code]
+        )
 
         val context = ScriptContext(
           txInfo = TxInfo(
@@ -63,10 +63,11 @@ class VestingTest extends AnyFunSuite, ScalusTest {
           scriptInfo = ScriptInfo.SpendingScript(
             txOutRef = inputs.head.outRef,
             datum = Some(
-              VestingData(
-                lockUntil = testCase.lockUntil,
-                ownerPKH = ownerPKH,
-                beneficiaryPKH = beneficiaryPKH
+              VestingDatum(
+                beneficiary = beneficiaryPKH,
+                startTimestamp = 1609459200, // 2021-01-01
+                duration = 31536000, // 1 year
+                amount = 1000000 // 1
               ).toData
             )
           )

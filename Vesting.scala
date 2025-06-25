@@ -2,31 +2,34 @@ package validator
 
 import scalus.*
 import scalus.builtin.*
-import scalus.builtin.Data
-import scalus.builtin.Builtins.trace
 import scalus.ledger.api.v3.*
 import scalus.prelude.*
 import scalus.prelude.log
 import scalus.prelude.Option.*
-import scalus.prelude.Prelude.*
 import scalus.prelude.given_Eq_ByteString
-
-import scalus.builtin.FromData
-import scalus.builtin.Data.toData
 import scalus.ledger.api.v1.IntervalBoundType.*
+import scalus.prelude.Eq
+import scalus.ledger.api.v2.OutputDatum
+import scalus.builtin.Data.{FromData, ToData, fromData, toData}
 
-// case class VestingData(lockUntil: BigInt, ownerPKH: PubKeyHash, beneficiaryPKH: PubKeyHash) derives FromData, ToData 
-
-case class VestingDatum(beneficiary: PubKeyHash, startTimestamp: PosixTime, duration: PosixTime, amount: Lovelace) derives FromData, ToData
-
-case class VestingRedeemer(amout: Lovelace) derives FromData, ToData
+case class VestingDatum(
+    beneficiary: PubKeyHash,
+    startTimestamp: PosixTime,
+    duration: PosixTime,
+    amount: Lovelace
+) derives FromData,
+      ToData
 
 @Compile
-object VestingData
+object VestingDatum
+
+case class VestingRedeemer(amount: Lovelace) derives FromData, ToData
+
+@Compile
+object VestingRedeemer
 
 @Compile
 object Vesting extends Validator:
-    // write a test for this from Aiken (Mesh) Vesting
     override def spend(
         datum: Option[Data],
         redeemer: Data,
@@ -38,10 +41,23 @@ object Vesting extends Validator:
         val VestingRedeemer(declaredAmount) = redeemer.to[VestingRedeemer]
 
         val ownInput: TxInInfo = Utils.getOwnInput(tx.inputs, ownRef)
+        val contractAddress = ownInput.resolved.address // check
         val contractAmount = ownInput.resolved.value
             .get(ByteString.empty) // Will be always 0 I guess
             .flatMap(_.get(ByteString.empty))
-            .getOrElse(BigInt(0)) 
+            .getOrElse(BigInt(0))
+
+        val contractOutputs = tx.outputs.filter(_.address === contractAddress)
+
+        val beneficiaryInputs = tx.inputs.filter(_.resolved.address.credential match
+            case Credential.PubKeyCredential(pkh) => pkh === vestingDatum.beneficiary
+            case _                                => false
+        )
+
+        val beneficiaryOutputs = tx.outputs.filter(_.address.credential match
+            case Credential.PubKeyCredential(pkh) => pkh === vestingDatum.beneficiary
+            case _                                => false
+        )
 
         val txEarliestTime = tx.validRange.from.boundType match
             case Finite(t) => t
@@ -56,6 +72,53 @@ object Vesting extends Validator:
             else if timestamp > max then total
             else total * (timestamp - vestingDatum.startTimestamp) / vestingDatum.duration
         }
-            
+
         val releaseAmount = linearVesting(vestingDatum.amount, txEarliestTime) - released
+
+        require(
+          tx.signatories.contains(vestingDatum.beneficiary),
+          "No signature from beneficiary"
+        )
+        require(
+          declaredAmount == releaseAmount,
+          s"Declared amount $declaredAmount does not match calculated amount $releaseAmount"
+        )
+
+        val adaInInputs = beneficiaryInputs
+            .map(
+              _.resolved.value
+                  .get(ByteString.empty)
+                  .flatMap(_.get(ByteString.empty))
+                  .getOrElse(BigInt(0))
+            )
+            .foldLeft(BigInt(0))(_ + _) // foldLeft should add all values
+
+        val adaInOutputs = beneficiaryOutputs
+            .map(
+              _.value
+                  .get(ByteString.empty)
+                  .flatMap(_.get(ByteString.empty))
+                  .getOrElse(BigInt(0))
+            )
+            .foldLeft(BigInt(0))(_ + _)
+
+        val expectedOutput = declaredAmount + adaInInputs - tx.fee
+
+        require(
+          adaInOutputs == expectedOutput,
+          s"Beneficiary output mismatch: got $adaInOutputs, expected $expectedOutput"
+        )
+
+        if declaredAmount == contractAmount then ()
+        else require(contractOutputs.length == BigInt(1), "Expected exactly one contract output")
+
+        val contractOutput = contractOutputs.head
+        contractOutput.datum match
+            case OutputDatum.OutputDatum(inlineData) =>
+                val contractDatum = inlineData.to[VestingDatum]
+                require(
+                  contractDatum.toData == vestingDatum.toData,
+                  "VestingDatum mismatch"
+                )
+            case _ => require(false, "Expected inline datum")
     }
