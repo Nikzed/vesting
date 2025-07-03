@@ -4,16 +4,20 @@ import scalus.builtin.ByteString
 import scalus.builtin.Builtins.blake2b_224
 import scalus.builtin.Builtins.appendByteString
 import scalus.ledger.api.v1.PubKeyHash
+import scalus.ledger.api.v3.{TxId, TxOutRef}
 
 object Mock {
-    val rootHash: ByteString = ByteString.fromHex("a2c20c77887ace1cd986193e4e75babd8993cfd56995cd5cfce609c2") // I guess can be anything
-    
+    val rootHash: ByteString =
+        ByteString.fromHex("a2c20c77887ace1cd986193e4e75babd8993cfd56995cd5cfce609c2")
+
     private def mockKeyHash(variation: BigInt): ByteString = {
         val variationBytes = ByteString.fromArray(variation.toByteArray)
         blake2b_224(appendByteString(variationBytes, rootHash))
     }
 
-    def mockPubKeyHash(variation: BigInt): PubKeyHash = {
-        PubKeyHash(mockKeyHash(variation))
-    }
+    def mockPubKeyHash(variation: BigInt): PubKeyHash = PubKeyHash(mockKeyHash(variation))
+
+    def txOutRef(txIdVariation: BigInt, idx: BigInt): TxOutRef = TxOutRef(txId(txIdVariation), idx)
+
+    def txId(variation: BigInt): TxId = TxId(mockKeyHash(variation + 100))
 }
