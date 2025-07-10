@@ -13,21 +13,20 @@ import scalus.ledger.api.v2.OutputDatum
 import scalus.builtin.Data.{FromData, ToData, fromData, toData}
 import scalus.ledger.api.v1.Value.getLovelace
 import scalus.Compiler.compile
+import scalus.builtin.Builtins.trace
 
 case class VestingDatum(
     beneficiary: PubKeyHash,
     startTimestamp: PosixTime,
     duration: PosixTime,
-    amount: Lovelace // Maybe change to initialAmount
+    initialAmount: Lovelace
 ) derives FromData,
       ToData
 
 @Compile
 object VestingDatum
 
-case class VestingRedeemer(amount: Lovelace) // Maybe change to amountToWithdraw
-    derives FromData,
-      ToData
+case class VestingRedeemer(amount: Lovelace) derives FromData, ToData
 
 @Compile
 object VestingRedeemer
@@ -44,6 +43,8 @@ object Vesting extends Validator:
         val vestingDatum: VestingDatum = receivedData.to[VestingDatum]
         val VestingRedeemer(requestedAmount) = redeemer.to[VestingRedeemer]
 
+        require(requestedAmount > 0, "Withdrawal amount must be greater than 0")
+
         val ownInput = Utils.getOwnInput(txInfo.inputs, txOutRef).resolved
         val contractAddress = ownInput.address
         val contractAmount = ownInput.value.getLovelace
@@ -55,16 +56,16 @@ object Vesting extends Validator:
             case Finite(t) => t
             case _         => BigInt(0)
 
-        val released = vestingDatum.amount - contractAmount
+        val released = vestingDatum.initialAmount - contractAmount
 
         def linearVesting(timestamp: BigInt): BigInt = {
             val min = vestingDatum.startTimestamp
             val max = vestingDatum.startTimestamp + vestingDatum.duration
             if timestamp < min then 0
-            else if timestamp >= max then vestingDatum.amount // changed from >
+            else if timestamp >= max then vestingDatum.initialAmount
             else
-                vestingDatum.amount * (timestamp - vestingDatum.startTimestamp) / vestingDatum.duration
-        } // test if you already released some amount
+                vestingDatum.initialAmount * (timestamp - vestingDatum.startTimestamp) / vestingDatum.duration
+        }
 
         val availableAmount = linearVesting(txEarliestTime) - released
 
@@ -73,7 +74,7 @@ object Vesting extends Validator:
           "No signature from beneficiary"
         )
         require(
-          requestedAmount <= availableAmount, // changed from ==
+          requestedAmount <= availableAmount,
           "Declared amount does not match calculated amount"
         )
 
@@ -81,7 +82,7 @@ object Vesting extends Validator:
             txInInfo.resolved.address.credential match
                 case Credential.PubKeyCredential(pkh) => pkh === vestingDatum.beneficiary
                 case _                                => false
-        ) // check
+        )
         val beneficiaryOutputs = txInfo.outputs.filter(txOut =>
             txOut.address.credential match
                 case Credential.PubKeyCredential(pkh) => pkh === vestingDatum.beneficiary
@@ -95,12 +96,8 @@ object Vesting extends Validator:
             .map(txOut => txOut.value.getLovelace)
             .foldLeft(BigInt(0))(_ + _)
 
-        val expectedOutput = requestedAmount + adaInInputs - txInfo.fee
-        // Can be deleted, same as adaInOutputs == expectedOutput
-        // require(
-        //   adaInOutputs - adaInInputs == requestedAmount - tx.fee,
-        //   "Beneficiary output mismatch"
-        // )
+        val expectedOutput =
+            requestedAmount + adaInInputs - txInfo.fee
 
         require(
           adaInOutputs == expectedOutput,
@@ -114,7 +111,7 @@ object Vesting extends Validator:
         contractOutput.datum match
             case OutputDatum.OutputDatum(inlineData) =>
                 require(
-                  inlineData == vestingDatum.toData, // This will always fail, inlineData is not VestingDatum
+                  inlineData == vestingDatum.toData, // Is there a beter way to compare?
                   "VestingDatum mismatch"
                 )
             case _ => fail("Expected inline datum")

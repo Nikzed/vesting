@@ -5,6 +5,7 @@ import scalus.builtin.Builtins.blake2b_224
 import scalus.builtin.Builtins.appendByteString
 import scalus.ledger.api.v1.PubKeyHash
 import scalus.ledger.api.v3.{TxId, TxOutRef}
+import scalus.ledger.api.v1.ValidatorHash
 
 object Mock {
     val rootHash: ByteString =
@@ -17,7 +18,10 @@ object Mock {
 
     def mockPubKeyHash(variation: BigInt): PubKeyHash = PubKeyHash(mockKeyHash(variation))
 
-    def txOutRef(txIdVariation: BigInt, idx: BigInt): TxOutRef = TxOutRef(txId(txIdVariation), idx)
+    def mockScriptHash(variation: BigInt): ValidatorHash =
+        mockKeyHash(variation + 200)
 
-    def txId(variation: BigInt): TxId = TxId(mockKeyHash(variation + 100))
+    // def txOutRef(txIdVariation: BigInt, idx: BigInt): TxOutRef = TxOutRef(txId(txIdVariation), idx)
+
+    // def txId(variation: BigInt): TxId = TxId(mockKeyHash(variation + 100))
 }
