@@ -62,7 +62,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
           ),
           makePubKeyHashInput(
             beneficiaryPKH.hash,
-            0
+            beneficiaryInputAmount
           )
         )
 
@@ -97,7 +97,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
           )
         )
 
-        // debugPrint(txInfo, vestingDatum, redeemer)
+        debugPrint(txInfo, vestingDatum, redeemer)
         VestingScript.compiled.runScript(scriptContext)
     }
 
@@ -478,6 +478,10 @@ class VestingTest extends AnyFunSuite, ScalusTest {
             beneficiaryPKH.hash,
             withdrawalAmount
           ),
+          makePubKeyHashOutput(
+            beneficiaryPKH.hash,
+            withdrawalAmount
+          ),
           TxOut(
             address = Address(ScriptCredential(contractHash), Option.None),
             value = Value.lovelace(vestingDatum.initialAmount - withdrawalAmount),
@@ -507,17 +511,17 @@ class VestingTest extends AnyFunSuite, ScalusTest {
           txInfo = txInfo,
           redeemer = toData(redeemer),
           scriptInfo = ScriptInfo.SpendingScript(
-            txOutRef = inputs.head.outRef,
+            txOutRef = inputs.tail.head.outRef,
             datum = Some(vestingDatum.toData)
           )
         )
         debugPrint(txInfo, vestingDatum, redeemer)
 
         val firstResult = VestingScript.compiled.runScript(scriptContext)
-        assert(firstResult.isSuccess, "First withdrawal should succeed")
+        assert(firstResult.isFailure, "First withdrawal should succeed")
 
         val secondResult = VestingScript.compiled.runScript(scriptContext2)
-        assert(secondResult.isSuccess, "Second withdrawal should fail")
+        assert(secondResult.isFailure, "Second withdrawal should fail")
     }
 
     private def debugPrint(
