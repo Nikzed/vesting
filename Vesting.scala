@@ -121,4 +121,5 @@ object Vesting extends Validator:
 
 object VestingScript {
     val compiled = compile(Vesting.validate)
+    val doubleCborHex = compiled.toUplc(true).plutusV2.doubleCborHex
 }
