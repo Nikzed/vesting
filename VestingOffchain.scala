@@ -49,12 +49,9 @@ object VestingOffChain:
         AddressProvider.getEntAddress(script, network).toBech32()
 
     def lock(amountAda: Long, datum: Data): Unit =
-        println(s"my address: ${sender.getBaseAddress.getAddress}")
         val tx = new Tx()
             .from(sender.getBaseAddress.getAddress)
             .payToContract(scriptAddressBech32, Amount.ada(amountAda), toPlutusData(datum))
-
-        println(s"my tx is: ${tx.toString()}")
 
         val signedTx = QuickTxBuilder(backendService)
             .compose(tx)
@@ -97,7 +94,6 @@ object VestingOffChain:
         println(s"Result is: ${result}")
 
     def main(args: Array[String]): Unit =
-        // TODO: This should be dynamically generated from actual VestingDatum
         val beneficiary = ByteString.fromArray(sender.hdKeyPair().getPublicKey.getKeyHash)
         // val beneficiary = sender.getBaseAddress().getPaymentCredentialHash()
         val beneficiaryPKH = Interop.getAddress(sender.getBaseAddress).credential match
@@ -110,5 +106,3 @@ object VestingOffChain:
         lock(15, datum.toData)
         Thread.sleep(60 * 1000)
         unlock(datum.toData, redeemer.toData, beneficiary)
-
-// 1, 2, 3
