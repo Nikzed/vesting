@@ -20,8 +20,4 @@ object Mock {
 
     def mockScriptHash(variation: BigInt): ValidatorHash =
         mockKeyHash(variation + 200)
-
-    // def txOutRef(txIdVariation: BigInt, idx: BigInt): TxOutRef = TxOutRef(txId(txIdVariation), idx)
-
-    // def txId(variation: BigInt): TxId = TxId(mockKeyHash(variation + 100))
 }

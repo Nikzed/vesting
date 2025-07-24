@@ -1,7 +1,6 @@
 package validator
 
 import scalus.*
-import scalus.builtin.*
 import scalus.ledger.api.v3.*
 import scalus.prelude.*
 import scalus.prelude.log
@@ -10,6 +9,7 @@ import scalus.prelude.given_Eq_ByteString
 import scalus.ledger.api.v1.IntervalBoundType.*
 import scalus.prelude.Eq
 import scalus.ledger.api.v2.OutputDatum
+import scalus.builtin.Data
 import scalus.builtin.Data.{FromData, ToData, fromData, toData}
 import scalus.ledger.api.v1.Value.getLovelace
 import scalus.Compiler.compile
@@ -24,7 +24,10 @@ case class VestingDatum(
       ToData
 
 @Compile
-object VestingDatum
+object VestingDatum {
+    given Eq[VestingDatum] = (x, y) =>
+        x.beneficiary === y.beneficiary && x.startTimestamp == y.startTimestamp && x.duration == y.duration && x.initialAmount == y.initialAmount
+}
 
 case class VestingRedeemer(amount: Lovelace) derives FromData, ToData
 
@@ -49,8 +52,7 @@ object Vesting extends Validator:
         val contractAddress = ownInput.address
         val contractAmount = ownInput.value.getLovelace
 
-        val contractOutputs =
-            txInfo.outputs.filter(txOut => txOut.address === contractAddress) // I don't undertand
+        val contractOutputs = txInfo.outputs.filter(txOut => txOut.address === contractAddress)
 
         val txEarliestTime = txInfo.validRange.from.boundType match
             case Finite(t) => t
@@ -111,7 +113,7 @@ object Vesting extends Validator:
         contractOutput.datum match
             case OutputDatum.OutputDatum(inlineData) =>
                 require(
-                  inlineData == vestingDatum.toData, // Is there a beter way to compare?
+                  inlineData == receivedData,
                   "VestingDatum mismatch"
                 )
             case _ => fail("Expected inline datum")

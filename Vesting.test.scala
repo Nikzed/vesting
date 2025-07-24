@@ -97,7 +97,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
           )
         )
 
-        debugPrint(txInfo, vestingDatum, redeemer)
+        // debugPrint(txInfo, vestingDatum, redeemer)
         VestingScript.compiled.runScript(scriptContext)
     }
 
@@ -271,7 +271,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
         // Set time to 75% of vesting period
         val interval = Interval.after(vestingDatum.startTimestamp + (vestingDatum.duration * 3) / 4)
 
-        // Simulate that 25% was already withdrawn (contract has 75% of original amount)
+        // Simulate that 25% was already withdrawn
         val remainingInContract = (vestingDatum.initialAmount * 3) / 4
         val alreadyVested = (vestingDatum.initialAmount * 3) / 4
         val alreadyWithdrawn = vestingDatum.initialAmount / 4
@@ -515,7 +515,7 @@ class VestingTest extends AnyFunSuite, ScalusTest {
             datum = Some(vestingDatum.toData)
           )
         )
-        debugPrint(txInfo, vestingDatum, redeemer)
+        // debugPrint(txInfo, vestingDatum, redeemer)
 
         val firstResult = VestingScript.compiled.runScript(scriptContext)
         assert(firstResult.isFailure, "First withdrawal should succeed")
@@ -603,11 +603,10 @@ class VestingTest extends AnyFunSuite, ScalusTest {
         val ownInput = Utils.getOwnInput(txInfo.inputs, txInfo.inputs.head.outRef).resolved
         val contractAmount = ownInput.value.getLovelace
         println("Contract Amount: " + contractAmount)
-        val released = vestingDatum.initialAmount - contractAmount // Can it be negative?
+        val released = vestingDatum.initialAmount - contractAmount
         println("Released Amount: " + released)
         val availableAmount = linearVestingTime - released
         println("Available Amount: " + availableAmount)
     }
 
 }
-// Create test with 2 ScriptContexts
