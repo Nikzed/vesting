@@ -107,19 +107,21 @@ object Vesting extends Validator:
         )
 
         if requestedAmount == contractAmount then ()
-        else require(contractOutputs.length == BigInt(1), "Expected exactly one contract output")
+        else {
+            require(contractOutputs.length == BigInt(1), "Expected exactly one contract output")
 
-        val contractOutput = contractOutputs.head
-        contractOutput.datum match
-            case OutputDatum.OutputDatum(inlineData) =>
-                require(
-                  inlineData == receivedData,
-                  "VestingDatum mismatch"
-                )
-            case _ => fail("Expected inline datum")
+            val contractOutput = contractOutputs.head
+            contractOutput.datum match
+                case OutputDatum.OutputDatum(inlineData) =>
+                    require(
+                      inlineData == receivedData,
+                      "VestingDatum mismatch"
+                    )
+                case _ => fail("Expected inline datum")
+        }
     }
 
 object VestingScript {
     val compiled = compile(Vesting.validate)
-    val doubleCborHex = compiled.toUplc(true).plutusV2.doubleCborHex
+    val doubleCborHex = compiled.toUplc(true).plutusV3.doubleCborHex
 }
